@@ -1,62 +1,63 @@
 from ._base import PolicyEvaluator
 import numpy as np
 
-
 class LinearSystemEvaluator(PolicyEvaluator):
 
     def __init__(self, mdp, gamma):
         super().__init__(gamma)
         self.mdp = mdp
-
-        # get closed form representation of the MDP
         self.states = list(mdp.states)
         self.size = len(self.states)
         self.probs = {}
+        
+        # Pre-cache transitions for speed
         for s in self.states:
             if not mdp.is_terminal_state(s):
                 p_s = {
-                    a: mdp.get_transition_distribution(s, a) for a in mdp.get_actions_in_state(s)
+                    a: mdp.get_transition_distribution(s, a) 
+                    for a in mdp.get_actions_in_state(s)
                 }
                 if p_s:
                     self.probs[s] = p_s
         self.rewards = np.array([mdp.get_reward(s) for s in self.states])
 
     def _after_reset(self):
-        """
-            Update q-values
-        """
-        
-        # get slice from P that is relevant for this policy
+        """Computes exact V and Q values using matrix algebra."""
         P_policy = np.zeros((self.size, self.size))
+        
         for i, s in enumerate(self.states):
             if s in self.probs:
-                a = self.policy(s)
+                # Handle both function policies and objects with .act()
+                a = self.policy(s) if callable(self.policy) else self.policy.act(s)
+                
                 if a in self.probs[s]:
-                    for j, s_prime in enumerate(self.states):
-                        if s_prime in self.probs[s][a]:
-                            P_policy[i, j] = self.probs[s][a][s_prime]
+                    for s_prime, prob in self.probs[s][a].items():
+                        j = self.states.index(s_prime)
+                        P_policy[i, j] = prob
                 else:
-                    raise ValueError(
-                        f"Policy chooses action {a} in state {s}, but no transition probability is defined for that action in P.")
+                    raise ValueError(f"Action {a} not defined for state {s}")
 
-        # create linear system of equations
+        # Solve (I - gamma * P) * V = R
         try:
-            B = np.eye(self.size) - self.gamma * P_policy
-            v = np.linalg.solve(B, self.rewards)
-            self._v_values = {s: v_s for s, v_s in zip(self.states, v)}
-        except:
-            gamma = min([1 - 10 ** -10, self.gamma])
-            B = np.eye(self.size) - gamma * P_policy
-            v = np.linalg.solve(B, self.rewards)
-            self._v_values = {s: v_s for s, v_s in zip(self.states, v)}
+            A = np.eye(self.size) - self.gamma * P_policy
+            v_sol = np.linalg.solve(A, self.rewards)
+        except np.linalg.LinAlgError:
+            # Fallback for gamma=1.0 or singular matrices
+            gamma_safe = min(0.99999999, self.gamma)
+            A = np.eye(self.size) - gamma_safe * P_policy
+            v_sol = np.linalg.solve(A, self.rewards)
+
+        self._v_values = {s: val for s, val in zip(self.states, v_sol)}
         
-        # now compute q-values from state values
+        # Derive Q-values from V-values: Q(s,a) = R(s) + gamma * sum(P(s'|s,a)V(s'))
         self._q_values = {}
-        for s, r in zip(self.states, self.rewards):
+        for i, s in enumerate(self.states):
             if s in self.probs:
                 self._q_values[s] = {}
-                for a, prob_for_successors in self.probs[s].items():
-                    self._q_values[s][a] = r + self.gamma * sum([p * self._v_values[ss] for ss, p in prob_for_successors.items()])
+                r = self.rewards[i]
+                for a, successors in self.probs[s].items():
+                    expected_v = sum(p * self._v_values[ss] for ss, p in successors.items())
+                    self._q_values[s][a] = r + self.gamma * expected_v
 
     @property
     def provides_state_values(self):

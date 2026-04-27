@@ -1,5 +1,4 @@
-from abc import ABC
-
+from abc import ABC, abstractmethod
 
 class PolicyIteration(ABC):
 
@@ -7,16 +6,17 @@ class PolicyIteration(ABC):
         self.policy_evaluator = policy_evaluator
         self.policy_improver = policy_improver
 
+    @abstractmethod
     def step(self):
         """
-            executes one iteration of the policy iteration algorithm
+        Executes one full iteration: Evaluation followed by Improvement.
+        :return: True if the policy changed (improved), False if it converged.
         """
         raise NotImplementedError
     
     def run(self, max_iter=10**6):
         """
-            :param max_iter: maximum number of iterations before the algorithm stops
-            tun
+        Runs the algorithm until convergence or max_iter is reached.
         """
         for _ in range(max_iter):
             improved = self.step()

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-
 class PolicyEvaluator(ABC):
 
     def __init__(self, gamma):
@@ -11,38 +10,32 @@ class PolicyEvaluator(ABC):
 
     def reset(self, policy):
         """
-            :param policy: the policy that is subject to evaluation
+        :param policy: the policy (callable or object with act()) subject to evaluation
         """
         self.policy = policy
         self._after_reset()
     
     def _after_reset(self):
         """
-            Hook function that is called after the policy has been resetted. Typical usage is to update q-values here.
+        Hook function called after the policy has been reset. 
+        Typical usage is to trigger the computation of v and q values.
         """
         pass
 
     @property
     @abstractmethod
     def provides_state_values(self):
-        """
-            True if this evaluator gives access to state values through the property `v`.
-        """
+        """True if this evaluator gives access to state values through the property `v`."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def v(self):
-        r"""
-            :return: a dictionary v where v[s] estimates v^\pi(s) for the current policy \pi
-        """
+        """Returns a dictionary v where v[s] estimates V^pi(s)."""
         raise NotImplementedError
-
 
     @property
     @abstractmethod
     def q(self):
-        r"""
-            :return: a 2-depth dictionary q where q[s][a] estimates q^\pi(s,a) for the current policy \pi
-        """
+        """Returns a 2-depth dictionary q where q[s][a] estimates Q^pi(s,a)."""
         raise NotImplementedError
