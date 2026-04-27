@@ -1,3 +1,17 @@
+from mdp._trial_interface import TrialInterface
+import numpy as np
+
+from policy_evaluation._linear import LinearSystemEvaluator
+from gpi._trial_based_policy_evaluator import TrialBasedPolicyEvaluator
+from mdp._base import ClosedFormMDP
+
+
+def _has_action(action):
+    return action is not None and not (
+        isinstance(action, (float, np.floating)) and np.isnan(action)
+    )
+
+
 class ADPPolicyEvaluation(TrialBasedPolicyEvaluator):
 
     def __init__(self, trial_interface, gamma, exploring_starts, max_trial_length=np.inf, random_state=None, 
