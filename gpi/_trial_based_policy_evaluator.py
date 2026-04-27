@@ -1,3 +1,13 @@
+try:
+    from ._base import GeneralPolicyIterationComponent
+except ImportError:
+    from _base import GeneralPolicyIterationComponent
+from mdp._trial_interface import TrialInterface
+import numpy as np
+import pandas as pd
+from abc import abstractmethod
+
+
 class TrialBasedPolicyEvaluator(GeneralPolicyIterationComponent):
 
     def __init__(

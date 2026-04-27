@@ -6,17 +6,31 @@ from gpi._trial_based_policy_evaluator import TrialBasedPolicyEvaluator
 
 class FirstVisitMonteCarloEvaluator(TrialBasedPolicyEvaluator):
 
-    def __init__(
-        self,
-        trial_interface: TrialInterface,
-        gamma: float,
-        exploring_starts: bool,
-        max_trial_length: int = np.inf,
-        random_state: np.random.RandomState = None,
-    ):
+    def __init__(self, trial_interface, gamma, exploring_starts, max_trial_length=np.inf, random_state=None):
+        super().__init__(trial_interface, gamma, exploring_starts, max_trial_length, random_state)
+        self.returns = {} 
 
     def process_trial_for_policy(self, df_trial, policy):
-        """
-        :param df_trial: dataframe with the trial (three columns with states, actions, and the rewards)
-        :return: returns a depth-2 dictionary that contains the *change* in the q-values (np.inf if a q-value was not available before)
-        """
+        g = 0
+        # Access shared workspace data
+        gamma = self.workspace.gamma
+        current_v = self.workspace.v if self.workspace.v is not None else {}
+        new_v = current_v.copy()
+        
+        # Calculate returns backwards
+        for i in range(len(df_trial) - 1, -1, -1):
+            row = df_trial.iloc[i]
+            s = row['state']
+            r = row['reward']
+            g = gamma * g + r
+            
+            # First-visit logic
+            if s not in df_trial.iloc[:i]['state'].values:
+                if s not in self.returns:
+                    self.returns[s] = []
+                self.returns[s].append(g)
+                new_v[s] = np.mean(self.returns[s])
+        
+        # Update the central workspace [cite: 10]
+        self.workspace.replace_v(new_v)
+        return {"states_updated": len(new_v)}
